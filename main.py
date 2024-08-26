@@ -10,8 +10,12 @@ from datetime import datetime , date
 import os
 from docx import Document  # Ensure this import is included
 from tkinter import filedialog
+from threading import Thread
+
 import time
 import sys
+import imageio
+
 from reportlab.pdfgen import canvas
 from reportlab.lib.colors import HexColor
 from tkinter import filedialog
@@ -37,6 +41,8 @@ def create_or_alter_table():
         columns = [info[1] for info in cursor.fetchall()]
         if 'gender' not in columns:
             cursor.execute("ALTER TABLE patients ADD COLUMN gender TEXT")
+        if 'status' not in columns:
+            cursor.execute("ALTER TABLE patients ADD COLUMN status TEXT DEFAULT 'Pending'")   
 
 
         # Create the prescriptions table if it does not exist
@@ -300,6 +306,11 @@ def generate_pdf(patient_id):
     else:
         os.startfile(pdf_path, "print")
 
+
+
+
+
+
 def save_prescription(patient_id):
     prescription = '\n'.join(selected_medicines)
     date = datetime.now().strftime("%d-%m-%Y %I:%M %p")
@@ -361,6 +372,10 @@ def save_prescription_and_generate_pdf(patient_id):
     generate_pdf(patient_id)
 
 
+# def save_status(patient_id, status):
+#     cursor.execute("UPDATE patients SET status = ? WHERE id = ?", (status, patient_id))
+#     conn.commit()
+#     messagebox.showinfo("Success", "Status updated successfully")
 
 def generatebackpdf():
     try:
@@ -501,7 +516,7 @@ def create_dental_care_window():
     line_frame.grid(row=1, column=0,padx = 80 , columnspan=4, sticky="new")  # Add space below the line # Adjust the y-coordinate and color as needed
 
     # Contact information
-    contact_label = ctk.CTkLabel(main_frame ,  text_color="white", font=("dubai" , 18 , "bold") , text="5 Umer Road Islampura Bazar Lahore\nCell: 92-335-9999375", fg_color="#db3333")
+    contact_label = ctk.CTkLabel(main_frame ,  text_color="white", font=("dubai" , 18 , "bold") , text="5 Umer Road Islampura Bazar Lahore\nWhatsapp: 92-335-9999375", fg_color="#db3333")
     contact_label.grid(row=4, column=1,  columnspan=4,padx = (0 , 10) , pady= 5, sticky="wes")
     #  Adjust the y-coordinate and color as needed
 
@@ -565,7 +580,7 @@ def create_dental_care_window():
 def fetch_patients():
     conn = sqlite3.connect('patients.db')
     cursor = conn.cursor()
-    cursor.execute("SELECT id, name, age, disease, phone, gender FROM patients")
+    cursor.execute("SELECT id, name, age, disease, phone, gender , status FROM patients")
     rows = cursor.fetchall()
     conn.close()
     return rows
@@ -1120,6 +1135,21 @@ def delete_patient(patient_id):
         messagebox.showinfo("Deleted", "Patient has been deleted successfully.")
         show_patients()  # Refresh the patient list after deletion
 
+def save_status(patient_id, status):
+    try:
+        conn = sqlite3.connect('patients.db')
+        cursor = conn.cursor()
+
+        cursor.execute('''UPDATE patients SET status = ? WHERE id = ?''', (status, patient_id))
+        conn.commit()
+        
+        messagebox.showinfo("Success", "Status updated successfully!")
+    except sqlite3.Error as e:
+        print(f"An error occurred: {e}")
+        messagebox.showerror("Error", "An error occurred while updating status.")
+    finally:
+        conn.close()
+
 def HistoryPage(patient_id):
     for widget in root.winfo_children():
         widget.destroy()
@@ -1134,6 +1164,10 @@ def HistoryPage(patient_id):
 
     left_frame = ctk.CTkFrame(main_frame , fg_color="white")
     left_frame.pack(side="left", fill=Y)
+
+
+
+    
 
     logo_image = Image.open("Images/logo.png")
     logo_image = logo_image.resize((175, 130), Image.LANCZOS)  # Resize the image (width, height)
@@ -1306,10 +1340,10 @@ def HistoryPage(patient_id):
         conn = sqlite3.connect('patients.db')
         cursor = conn.cursor()
         if patient_id:
-            cursor.execute("SELECT id, name, age, disease, phone, gender FROM patients")
+            cursor.execute("SELECT id, name, age, disease, phone, gender , status FROM patients")
 
         else:
-            cursor.execute("SELECT id, name, age, disease, phone, gender FROM patients")
+            cursor.execute("SELECT id, name, age, disease, phone, gender , status FROM patients")
 
         rows = cursor.fetchall()
         conn.close()
@@ -1324,6 +1358,7 @@ def HistoryPage(patient_id):
             return "No patient found with the provided ID."
         
         patient = patients[0]
+
         details = (
             f"ID:\t\t {patient[0]}\n"
             f"Name:\t\t {patient[1]}\n"
@@ -1615,6 +1650,13 @@ def HistoryPage(patient_id):
         gender_menu = ctk.CTkOptionMenu(edit_window, fg_color="#db3333" , button_color="#db3333" ,  variable=gender_var, values=["Male", "Female", "Other"])
         gender_menu.pack(pady=5)
 
+
+
+
+    # Save button to save the selected status
+        # save_button = ctk.CTkButton(left_frame, text="Save", command=lambda: save_status(patient_id, status_var.get()))
+        # save_button.pack(pady=10)
+
     # Save button
         ctk.CTkButton(edit_window, text="Save Changes", command=save_changes).pack(pady=10)
 
@@ -1642,7 +1684,13 @@ def HistoryPage(patient_id):
             logo_image = logo_image.resize((175, 130), Image.LANCZOS)  # Resize the image (width, height)
             logo_photo = ImageTk.PhotoImage(logo_image)
             logo_label = ctk.CTkLabel(left_frame, text="", image=logo_photo)
-            logo_label.pack(padx=30, pady=40)
+            logo_label.pack(padx=30, pady=(40 , 30))
+
+
+
+
+            ctk.CTkButton(left_frame, text="Back to Patient List", fg_color="#FF1C60", font=("Dubai", 15, "bold"), command=show_patients).pack(pady=(0 , 30), padx=30)
+
         # Add patient details to the left frame
             add_row("Patient ID: ", f"{patient[0]:03}")
             add_row("Name: ", f"{patient[1]}")
@@ -1651,11 +1699,31 @@ def HistoryPage(patient_id):
             add_row("Phone Number: ", f"{patient[4]}")
             add_row("Gender: ", f"{patient[5]}")
 
+
+
+
+# Create the frame and assign it to the variable
+            statusFrame = ctk.CTkFrame(left_frame , fg_color="white")
+# Use pack()   separately
+            statusFrame.pack(pady = 30)
+
+# Create the label and assign it to the variable
+            StatusLabel = ctk.CTkLabel(statusFrame, text="Status", font=("dubai", 18, "bold"), text_color="#db3333")
+# Use pack() separately
+            StatusLabel.pack()
+            # global status_var
+
+
+            status_var = ctk.StringVar(value=patient[6] if patient[6] else "Pending")  # Default value is "Male"
+            status_dropdown = ctk.CTkOptionMenu( statusFrame, fg_color="#db3333", button_color="#db3333",  variable=status_var, values=["Pending", "Completed"])
+            status_dropdown.pack(padx=10, pady=10 , side = "left")
+            btnSave = ctk.CTkButton(statusFrame ,  command=lambda: save_status(patient_id, status_var.get()), text="Save" , width = 25 , font=("dubai" , 13 , "bold")).pack(side = "left")
+
+
         # Add a button to go back to the patient list
-            ctk.CTkButton(left_frame, text="Back to Patient List", fg_color="#FF1C60", font=("Dubai", 15, "bold"), command=show_patients).pack(pady=30, padx=30)
         
         # Add a button to edit patient info
-            ctk.CTkButton(left_frame, text="Edit Info", fg_color="#00c2ff", font=("Dubai", 15, "bold"), command=lambda: edit_patient_info(patient, lambda: display_patient_info(left_frame, fetch_patient(patient[0]), show_patients))).pack(pady=10, padx=30)
+            ctk.CTkButton(left_frame, text="Edit Info", fg_color="#00c2ff", font=("Dubai", 15, "bold"), command=lambda: edit_patient_info(patient, lambda: display_patient_info(left_frame, fetch_patient(patient[0]), show_patients))).pack(padx=30)
 
 
 
@@ -1685,19 +1753,19 @@ def search_patients():
     logo_image = logo_image.resize((880, 160), Image.LANCZOS)  # Resize the image (width, height)
     logo_photo = ImageTk.PhotoImage(logo_image)
     logo_label = ctk.CTkLabel(mainFramePat, text="", image=logo_photo)
-    logo_label.grid(row=0, column=0, columnspan=8, pady=10, sticky="n")
+    logo_label.grid(row=0, column=0, columnspan=9, pady=10, sticky="n")
 
     
     # Add a separator line
     line_frame = ctk.CTkFrame(mainFramePat, height=3, fg_color="#db3333")
-    line_frame.grid(row=1, column=0, columnspan=8, padx=80, sticky="new")
+    line_frame.grid(row=1, column=0, columnspan=9, padx=80, sticky="new")
 
 
     # Add widgets to the second frame
-    ctk.CTkLabel(mainFramePat, text="Patients List", font=("Dubai", 26, "bold"), text_color="#DB3333").grid(row=1, column=0, columnspan=8, padx=10, pady=20)
+    ctk.CTkLabel(mainFramePat, text="Patients List", font=("Dubai", 26, "bold"), text_color="#DB3333").grid(row=1, column=0, columnspan=9, padx=10, pady=20)
     ctk.CTkButton(mainFramePat, text="Back", fg_color="#FF1C60", font=("Dubai", 14, "bold"), command=create_dental_care_window).grid(row=1, column=0, pady=10)
 
-    headers = ["Patient-ID", "Name", "Age", "Treatment Protocol", "Phone Number","Gender" ,  "History", "Prescribe"]
+    headers = ["Status" , "Patient-ID", "Name", "Age", "Treatment Protocol", "Phone Number","Gender" ,  "Manage", "Prescribe"]
     for col, header in enumerate(headers):
         ctk.CTkLabel(mainFramePat, text=header, font=("Dubai", 16, "bold")).grid(row=2, column=col, padx= 10 , pady = 30)
 
@@ -1706,18 +1774,27 @@ def search_patients():
         if search_term in patient[1].lower() 
         or search_term == f"{patient[0]:03}"  # Ensuring patient ID is formatted as a 3-digit number
         or search_term in patient[4]
-]
+    ]
     for row, patient in enumerate(filtered_patients, start=3):
         patient_id = f"{patient[0]:03}"
-        ctk.CTkLabel(mainFramePat, text=patient_id, text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=0, padx=10, pady=20)
-        ctk.CTkLabel(mainFramePat, text=patient[1], text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=1, padx=10, pady=20)
-        ctk.CTkLabel(mainFramePat, text=patient[2], text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=2, padx=10, pady=20)
-        ctk.CTkLabel(mainFramePat, text=patient[3], text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=3, padx=10, pady=20)
-        ctk.CTkLabel(mainFramePat, text=patient[4], text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=4, padx=10, pady=20)
-        ctk.CTkLabel(mainFramePat, text=patient[5], text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=5, padx=10, pady=20)
-        ctk.CTkButton(mainFramePat, text="History", font=("Dubai", 14 , "bold"), command=lambda p=patient[0]: HistoryPage(p)).grid(row=row, column=6, pady=20, padx=10)
-        ctk.CTkButton(mainFramePat, text="Prescribe", fg_color="#db3333", font=("Dubai", 14 , "bold"), command=lambda p=patient[0]: PrescriptionPage(p)).grid(row=row, column=7, pady=20, padx=10)
-    ctk.CTkButton(mainFramePat, text="Refresh", font=("Dubai", 14, "bold"),  command=show_patients).grid(row=1, column=7, pady=20)
+
+        box_color = "#db3333" if patient[6] == "Pending" else "#3333db"
+
+    # Create the colored box (label) for the status
+        status_box = ctk.CTkLabel(mainFramePat, text="", width=20, height=20, fg_color=box_color)
+        status_box.grid(row=row, column=0, padx=5, pady=20)
+
+        ctk.CTkLabel(mainFramePat, text=patient_id, text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=1, padx=10, pady=20)
+        ctk.CTkLabel(mainFramePat, text=patient[1], text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=2, padx=10, pady=20)
+        ctk.CTkLabel(mainFramePat, text=patient[2], text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=3, padx=10, pady=20)
+        ctk.CTkLabel(mainFramePat, text=patient[3], text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=4, padx=10, pady=20)
+        ctk.CTkLabel(mainFramePat, text=patient[4], text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=5, padx=10, pady=20)
+        ctk.CTkLabel(mainFramePat, text=patient[5], text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=6, padx=10, pady=20)
+    
+        ctk.CTkButton(mainFramePat, text="Manage", font=("Dubai", 14, "bold"), command=lambda p=patient[0]: HistoryPage(p)).grid(row=row, column=7, pady=20, padx=10)
+        ctk.CTkButton(mainFramePat, text="Prescribe", fg_color="#db3333", font=("Dubai", 14, "bold"), command=lambda p=patient[0]: PrescriptionPage(p)).grid(row=row, column=8, pady=20, padx=10)
+
+    ctk.CTkButton(mainFramePat, text="Refresh", font=("Dubai", 14, "bold"),  command=show_patients).grid(row=1, column=8, pady=20)
 
 
 
@@ -1741,7 +1818,7 @@ def show_patients():
 
     
 
-    mainFramePat.columnconfigure((0, 1, 2, 3, 4, 5, 6 , 7) , weight=1)
+    mainFramePat.columnconfigure((0, 1, 2, 3, 4, 5, 6 , 7, 8) , weight=1)
 
     # Adding logos or additional elements
     # Load and display logo at the top center
@@ -1749,21 +1826,21 @@ def show_patients():
     logo_image = logo_image.resize((880, 160), Image.LANCZOS)  # Resize the image (width, height)
     logo_photo = ImageTk.PhotoImage(logo_image)
     logo_label = ctk.CTkLabel(mainFramePat, text="", image=logo_photo)
-    logo_label.grid(row=0, column=0, columnspan=8, pady=10, sticky="n")
+    logo_label.grid(row=0, column=0, columnspan=9, pady=10, sticky="n")
 
     
     # Add a separator line
     line_frame = ctk.CTkFrame(mainFramePat, height=3, fg_color="#db3333")
-    line_frame.grid(row=1, column=0, columnspan=8,  padx=80, sticky="new")
+    line_frame.grid(row=1, column=0, columnspan=9,  padx=80, sticky="new")
 # Load the background image
 
     
 
 #     # Add widgets to the second frame
-    ctk.CTkLabel(mainFramePat, text="Patients List", font=("Dubai", 26, "bold"), text_color="#DB3333").grid(row=1, column=0, columnspan=8, padx=10, pady=20)
+    ctk.CTkLabel(mainFramePat, text="Patients List", font=("Dubai", 26, "bold"), text_color="#DB3333").grid(row=1, column=0, columnspan=9, padx=10, pady=20)
     ctk.CTkButton(mainFramePat, text="Back", fg_color="#FF1C60", font=("Dubai", 14, "bold"), command=create_dental_care_window).grid(row=1, column=0, pady=10)
 
-    headers = ["Patient-ID", "Name", "Age", "Treatment Protocol", "Phone Number", "Gender" ,  "History", "Prescribe"]
+    headers = ["Status", "Patient-ID", "Name", "Age", "Treatment Protocol", "Phone Number", "Gender" ,  "Manage", "Prescribe"]
     for col, header in enumerate(headers):
         ctk.CTkLabel(mainFramePat, text=header, font=("Dubai", 16, "bold")).grid(row=2, column=col, padx= 10 , pady = 30)
 
@@ -1771,21 +1848,29 @@ def show_patients():
     patients = fetch_patients()
     for row, patient in enumerate(patients, start=3):
         patient_id = f"{patient[0]:03}"
-        ctk.CTkLabel(mainFramePat, text=patient_id, text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=0, padx=10,  pady=20)
-        ctk.CTkLabel(mainFramePat, text=patient[1], text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=1, padx=10,  pady=20)
-        ctk.CTkLabel(mainFramePat, text=patient[2], text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=2, padx=10,  pady=20)
-        ctk.CTkLabel(mainFramePat, text=patient[3], text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=3,  padx=10,pady=20)
-        ctk.CTkLabel(mainFramePat, text=patient[4], text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=4,  padx=10, pady=20)
-        ctk.CTkLabel(mainFramePat, text=patient[5], text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=5,  padx=10, pady=20)
-        ctk.CTkButton(mainFramePat, text="History" , font=("Dubai", 14 , "bold"), command=lambda p=patient[0]: HistoryPage(p)).grid(row=row, column=6, pady=20, padx=10)
-        ctk.CTkButton(mainFramePat, text="Prescribe", fg_color="#db3333", font=("Dubai", 14 , "bold"), command=lambda p=patient[0]: PrescriptionPage(p)).grid(row=row, column=7, pady=20, padx=10)
+
+        box_color = "#db3333" if patient[6] == "Pending" else "#0e8bf1"
+
+    # Create the colored box (label) for the status
+        status_box = ctk.CTkLabel(mainFramePat, text="", width=20, height=20, fg_color=box_color)
+        status_box.grid(row=row, column=0, padx=5, pady=20)
+
+        ctk.CTkLabel(mainFramePat, text=patient_id, text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=1, padx=10, pady=20)
+        ctk.CTkLabel(mainFramePat, text=patient[1], text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=2, padx=10, pady=20)
+        ctk.CTkLabel(mainFramePat, text=patient[2], text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=3, padx=10, pady=20)
+        ctk.CTkLabel(mainFramePat, text=patient[3], text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=4, padx=10, pady=20)
+        ctk.CTkLabel(mainFramePat, text=patient[4], text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=5, padx=10, pady=20)
+        ctk.CTkLabel(mainFramePat, text=patient[5], text_color="#6F6F6F", font=("Dubai", 15, "bold")).grid(row=row, column=6, padx=10, pady=20)
+    
+        ctk.CTkButton(mainFramePat, text="Manage", font=("Dubai", 14, "bold"), command=lambda p=patient[0]: HistoryPage(p)).grid(row=row, column=7, pady=20, padx=10)
+        ctk.CTkButton(mainFramePat, text="Prescribe", fg_color="#db3333", font=("Dubai", 14, "bold"), command=lambda p=patient[0]: PrescriptionPage(p)).grid(row=row, column=8, pady=20, padx=10)
 
 #     ctk.CTkButton(second_frame, text="Refresh", font=("Dubai", 14), command=show_patients).grid(row=len(patients) + 2, column=6, pady=20)
 
 
     # Add search bar
     search_bar_frame = ctk.CTkFrame(mainFramePat , fg_color="white")
-    search_bar_frame.grid(row = 1 , column = 6 , columnspan=2)
+    search_bar_frame.grid(row = 1 , column = 7 , columnspan=2)
     global search_entry
     search_entry = ctk.CTkEntry(search_bar_frame, placeholder_text="Search by Name, ID, or Phone...", width=250 ,font=("Dubai", 14))
     search_entry.pack(side=LEFT, padx=10)
@@ -1801,7 +1886,7 @@ def show_patients():
 def fetch_patient(patient_id):
     conn = sqlite3.connect('patients.db')
     cursor = conn.cursor()
-    cursor.execute("SELECT id, name, age, disease , phone , gender FROM patients WHERE id=?", (patient_id,))
+    cursor.execute("SELECT id, name, age, disease , phone , gender , status FROM patients WHERE id=?", (patient_id,))
     row = cursor.fetchone()
     conn.close()
     return row
@@ -2012,9 +2097,16 @@ def PrescriptionPage(patient_id):
                 if var.get() == 1:
                     selected_items.append(checkbox.cget('text'))
 
-            # Display selected items under the "Medical History" label
+            # Update the global selected_medical_history
             global selected_medical_history
-            selected_medical_history = '\n'.join(selected_items)
+
+            # Append new selections to the previous selections
+            if selected_medical_history:
+                selected_medical_history += '\n' + '\n'.join(selected_items)
+            else:
+                selected_medical_history = '\n'.join(selected_items)
+
+            # Display selected items under the "Medical History" label
             medical_history_label.configure(text=selected_medical_history)
 
             # Save the updated medical history to the database
@@ -2061,6 +2153,7 @@ def PrescriptionPage(patient_id):
         # Add a button to add checked values
         add_button = ctk.CTkButton(medical_window, text="Add to Medical History", command=add_checked_values)
         add_button.pack(pady=10)
+
 
 
 
@@ -2384,6 +2477,29 @@ welcome_window.after(1500, show_main_window)
 
 welcome_window.mainloop()
 
+def play_video(video_path, on_complete):
+    video = imageio.get_reader(video_path)
+    try:
+        fps = video.get_meta_data()['fps']
+        skip_frames = 2  # Skip every other frame for 2x speed
+        for i, frame in enumerate(video.iter_data()):
+            if i % skip_frames == 0:
+                # Resize the frame to match the root window's size
+                frame_image = Image.fromarray(frame)
+                resized_frame = frame_image.resize((root.winfo_width(), root.winfo_height()), Image.LANCZOS)
+                frame_image_tk = ImageTk.PhotoImage(resized_frame)
+                if video_label.winfo_exists():
+                    root.after(0, update_video_label, frame_image_tk)
+                    root.after(int(1000 / (fps * 2)))  # Adjust timing to account for 2x speed
+        if video_label.winfo_exists():
+            root.after(0, on_complete)  # Call the on_complete function when the video ends
+    except Exception as e:
+        print(f"Error playing video {video_path}: {e}")
+
+def update_video_label(frame_image):
+    if video_label.winfo_exists():  # Check if video_label exists before updating
+        video_label.configure(image=frame_image)
+        video_label.image = frame_image  # Keep a reference to avoid garbage collection
 
 def initialize_welcome_window():
     for widget in root.winfo_children():
@@ -2391,86 +2507,20 @@ def initialize_welcome_window():
 
     # Create the welcome window
     welcome_window2 = ctk.CTkFrame(root)
-    bg_color = "white"  # Background color
-    welcome_window2.configure(fg_color=bg_color)
+    welcome_window2.configure(fg_color="black")  # Use black background during video playback
     welcome_window2.pack(fill="both", expand=True)
-    root.attributes('-fullscreen',True)  # Ensure it fills the root window
+    root.attributes('-fullscreen', True)
+ 
 
+    # Video playback label (fullscreen)
+    global video_label
+    video_label = ctk.CTkLabel(welcome_window2, text="")
+    video_label.pack(fill='both', expand=True)  # Ensure the video label covers the entire window
 
-
-    IMAGE_WIDTH = 850
-    IMAGE_HEIGHT = 800
-
-    def resize_image(image_path, width, height):
-        """Resize the image to the specified width and height."""
-        try:
-            with Image.open(image_path) as img:
-                img = img.resize((width, height), Image.LANCZOS)  # Resize the image
-                return ImageTk.PhotoImage(img)  # Convert to PhotoImage
-        except Exception as e:
-            print(f"Error loading image {image_path}: {e}")
-            return None
-
-    def update_content():
-        """Update the content (text and image) and cycle through them."""
-        global current_index
-
-        try:
-            # Update the text
-            text_widget.delete(1.0, tk.END)  # Clear current text
-            text_widget.insert(tk.END, texts[current_index], 'heading')
-            text_widget.insert(tk.END, '\n' + body_texts[current_index], 'body')
-
-            # Update the image
-            new_logo_photo = resize_image(images[current_index], IMAGE_WIDTH, IMAGE_HEIGHT)
-            if new_logo_photo:
-                logo_label.configure(image=new_logo_photo)
-                logo_label.image = new_logo_photo  # Keep a reference to avoid garbage collection
-
-            # Move to the next index
-            current_index = (current_index + 1) % len(texts)  # Cycle back to 0 after the last index
-
-            # Schedule the next update
-            welcome_window2.after(3000, update_content)  # Update every 3 seconds
-        except Exception as e:
-            print(f"Error updating content: {e}")
-
-    def close_window(event=None):
-        """Close the window."""
-        create_dental_care_window()
-        welcome_window2.destroy()
-
-    # Define the frames for content placement
-    welcome_frame_left = ctk.CTkFrame(welcome_window2, fg_color=bg_color)
-    welcome_frame_left.pack(side="left", expand=1, fill=tk.BOTH)
-    welcome_frame_right = ctk.CTkFrame(welcome_window2, fg_color="white")
-    welcome_frame_right.pack(side="left", expand=1, fill=tk.BOTH)
-
-
-    logo_image = Image.open("Images/FullLogo.png")
-    logo_image = logo_image.resize((900, 140), Image.LANCZOS)
-    logo_photo = ImageTk.PhotoImage(logo_image)
-    logo_label = ctk.CTkLabel(welcome_frame_right, text="", image=logo_photo, anchor="center")
-    logo_label.pack(pady=10, padx=10, expand=True, fill='both')
-
-    # Initialize text widget for heading and body text
-    text_widget = tk.Text(welcome_frame_right, font=("Dubai", 24), wrap=tk.WORD, bg="white", borderwidth=0, height=10)
-    text_widget.pack(pady=20, padx=80, expand=True, fill='both', anchor="n")
-
-    # Define tags for different text styles
-    text_widget.tag_configure('heading', font=("Dubai", 38, "bold"), foreground="#db3333")
-    text_widget.tag_configure('body', font=("Dubai", 20), foreground="#333333")
-
-
-    # Load and resize the initial image
-    # initial_logo_photo = resize_image("Images/windowloading.png", IMAGE_WIDTH, IMAGE_HEIGHT)
-    # if initial_logo_photo:
-    #     initial_logo_label = ctk.CTkLabel(welcome_frame_left, text="", image=initial_logo_photo, anchor="center")
-    #     initial_logo_label.pack(pady=10, padx=10, expand=True, fill='both')
-
-    # Lists of images, headings, and body texts
-    global images, texts, body_texts, current_index
-    images = ["Images/image1.jpg", "Images/image2.jpg", "Images/image3.jpg", 
+    global text_widget, logo_label, images, texts, body_texts, current_index, videos
+    videos = ["videos/1.mp4", "videos/2.mp4", "videos/3.mp4",
+              "videos/4.mp4", "videos/5.mp4", "videos/6.mp4"]
+    images = ["Images/image1.jpg", "Images/image2.jpg", "Images/image3.jpg",
               "Images/image4.jpg", "Images/image5.jpg", "Images/image6.jpg"]
     texts = [
         "Welcome to NH Dental Care Clinic!",
@@ -2481,32 +2531,124 @@ def initialize_welcome_window():
         "Thank you for visiting!"
     ]
     body_texts = [
-        "Welcome to NH Dental Care Clinic, a trusted name in dental care. Our clinic has been dedicated to providing high-quality dental services to the community. Our journey began with a vision to create a welcoming and comfortable environment where patients of all ages can receive exceptional dental care.", 
+        "Welcome to NH Dental Care Clinic, a trusted name in dental care. Our clinic has been dedicated to providing high-quality dental services to the community. Our journey began with a vision to create a welcoming and comfortable environment where patients of all ages can receive exceptional dental care.",
         "We offer a wide range of dental services to meet your needs.",
-        "Dr. Zunaira - Dental Surgeon\t\tQualifications: B.D.S, R.D.S\n\nDr. Beena Shadab Khan - Maxillofacial Surgeon\t\tQualifications: B.D.S, R.D.S, MDS, (PGR) OMFS\n\nDr. Abdul Nasir Khan - Dental Surgeon\t\tQualifications: B.D.S, R.D.S, B.Sc (Eng)\n\nDr. Laraib Shoukat - Dental Surgeon\t\tQualifications: B.D.S, R.D.S\n\nDr. Hameez Sultan - Dental Surgeon\t\tQualifications: B.D.S, R.D.S",
+        "Dr. Zunaira - Dental Surgeon\tQualifications: B.D.S, R.D.S\n\nDr. Beena Shadab Khan - Maxillofacial Surgeon\tQualifications: B.D.S, R.D.S, MDS, (PGR) OMFS\n\nDr. Abdul Nasir Khan - Dental Surgeon\tQualifications: B.D.S, R.D.S, B.Sc (Eng)\n\nDr. Laraib Shoukat - Dental Surgeon\tQualifications: B.D.S, R.D.S\n\nDr. Hameez Sultan - Dental Surgeon\tQualifications: B.D.S, R.D.S",
         "Book your appointment now and take the first step towards a healthier smile.",
-        "Here, we pride ourselves on our state-of-the-art facilities, equipped with the latest dental technology for precise diagnostics and effective treatments. Our comprehensive services range from routine check-ups to advanced cosmetic procedures, tailored to meet all your dental needs. We prioritize personalized care, treating each patient individually to achieve specific dental health goals. Our friendly staff and serene environment ensure comfort and convenience, with flexible scheduling to accommodate your busy lifestyle. Committed to excellence, our dental professionals continuously learn and stay updated with the latest advancements in dentistry.",  
+        "Here, we pride ourselves on our state-of-the-art facilities, equipped with the latest dental technology for precise diagnostics and effective treatments. Our comprehensive services range from routine check-ups to advanced cosmetic procedures, tailored to meet all your dental needs. We prioritize personalized care, treating each patient individually to achieve specific dental health goals. Our friendly staff and serene environment ensure comfort and convenience, with flexible scheduling to accommodate your busy lifestyle. Committed to excellence, our dental professionals continuously learn and stay updated with the latest advancements in dentistry.",
         "We appreciate your trust in us and look forward to seeing you!"
     ]
 
-
     current_index = 0  # Start index for cycling through lists
 
-    # Start the content update loop
-    welcome_window2.after(0, update_content)  # Start immediately
-    root.bind("<Escape>", close_window)
- 
-    # Display company logo
-    logo_image_path = images[current_index]
-    logo_photo = resize_image(logo_image_path, IMAGE_WIDTH, IMAGE_HEIGHT)  # Set your desired width and height
-    if logo_photo:
-        logo_label = ctk.CTkLabel(welcome_frame_left, text="", image=logo_photo, anchor="center")
-        logo_label.pack(pady=10, padx=10, expand=True, fill='both')
+    def start_video_loop():
+        def play_videos():
+            if video_label.winfo_exists():
+                for video_path in videos:
+                    play_video(video_path, lambda: None)
+                if welcome_window2.winfo_exists():
+                    root.after(0, initialize_text_and_images)  # After videos, initialize content
 
+        Thread(target=play_videos).start()
 
+    def initialize_text_and_images():
+        if welcome_window2.winfo_exists():
+            welcome_window2.configure(fg_color="white") 
+            
+             # Change background to white for content
+            video_label.pack_forget()  # Hide the video label
+
+            # Create frames for left (image) and right (logo & text)
+            content_frame = ctk.CTkFrame(welcome_window2, fg_color="white")
+            content_frame.pack(fill="both", expand=True)
+
+            # Left frame for image
+            left_frame = ctk.CTkFrame(content_frame, fg_color="white")
+            left_frame.pack(side="left", fill="both", expand=True)
+
+            # Right frame for logo and text
+            right_frame = ctk.CTkFrame(content_frame, fg_color="white")
+            right_frame.pack(side="right", fill="both", expand=True)
+
+            # Inside right frame: create top section for logo and bottom section for text
+            logo_frame = ctk.CTkFrame(right_frame, fg_color="white")
+            logo_frame.pack(side="top", fill="x", padx=20, pady=10)
+
+            text_frame = ctk.CTkFrame(right_frame, fg_color="white")
+            text_frame.pack(side="top", fill="both", expand=True, padx=20, pady=10)
+
+            # Image on the left side
+            global logo_label
+            image_label = ctk.CTkLabel(left_frame, text="")
+            image_label.pack(pady=10, padx=10, expand=True, fill="both")
+
+            # Logo at the top right
+            logo_label = ctk.CTkLabel(logo_frame, text="")
+            logo_label.pack(expand=True, fill="both")
+
+            # Text on the bottom right
+        # Heading text (red color)
+            global heading_label
+            heading_label = ctk.CTkLabel(text_frame, text="", text_color="red", font=("dubai", 18, "bold"))
+            heading_label.pack(anchor="nw", pady=20, padx = 20)  # Top alignment with padding below
+
+        # Body text (black color)
+            global body_label
+            body_label = ctk.CTkLabel(text_frame, text="", text_color="black", font=("dubai", 18) ,justify="left", wraplength=600 )
+            body_label.pack(anchor="w", pady=20 ,padx = 20)  # Expands to fill available space
+
+            # Populate the text widget with content
+            update_content(image_label)  # Start content loop with the image label
+
+    def update_content(image_label):
+        global current_index
+
+        try:
+            if heading_label.winfo_exists() and body_label.winfo_exists():
+            # Update the heading and body text
+                heading_label.configure(text=texts[current_index])
+                body_label.configure(text=body_texts[current_index])
+
+                IMAGE_WIDTH = 800
+                IMAGE_HEIGHT = 800
+                new_image_photo = resize_image(images[current_index], IMAGE_WIDTH, IMAGE_HEIGHT)
+                if new_image_photo and image_label.winfo_exists():
+                    image_label.configure(image=new_image_photo)
+                    image_label.image = new_image_photo  # Keep a reference to avoid garbage collection
+
+                # Set logo at the top right (persistent)
+                logo_photo = resize_image("Images/fullLogo.png", 1000, 170)  # Adjust logo size
+                if logo_photo and logo_label.winfo_exists():
+                    logo_label.configure(image=logo_photo)
+                    logo_label.image = logo_photo  # Keep reference to avoid garbage collection
+
+                current_index += 1
+
+                if current_index >= len(texts):
+                    current_index = 0  # Reset index to loop content again
+                    if welcome_window2.winfo_exists():
+                        welcome_window2.after(3000, initialize_welcome_window)  # Start video loop again after content
+                else:
+                    if welcome_window2.winfo_exists():
+                        welcome_window2.after(3000, lambda: update_content(image_label))  # Update every 3 seconds
+        except Exception as e:
+            print(f"Error updating content: {e}")
+
+    root.bind("<Escape>", lambda event: root.quit())
+    start_video_loop()  # Start the video loop immediately
+
+def resize_image(image_path, width, height):
+    try:
+        image = Image.open(image_path)
+        resized_image = image.resize((width, height), Image.LANCZOS)
+        return ImageTk.PhotoImage(resized_image)  # Convert to PhotoImage
+    except Exception as e:
+        print(f"Error resizing image: {e}")
+        return None
 
 
 # Main
+
 root = ctk.CTk()
 root.title("Patient Management System")
 root.geometry("1200x900")
